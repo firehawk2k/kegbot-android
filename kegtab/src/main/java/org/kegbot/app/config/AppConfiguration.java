@@ -336,4 +336,12 @@ public class AppConfiguration {
     return get(ConfigKey.LAST_USED_KEG_SIZE);
   }
 
+
+  public void setShowActionBar(boolean value) {
+    setBoolean(ConfigKey.SHOW_ACTION_BAR, value);
+  }
+
+  public boolean getShowActionBar() {
+    return getBoolean(ConfigKey.SHOW_ACTION_BAR);
+  }
 }

@@ -72,7 +72,8 @@ enum ConfigKey {
 
   EMAIL_ADDRESS(""),
 
-  LAST_USED_KEG_SIZE(""),;
+  LAST_USED_KEG_SIZE(""),
+  SHOW_ACTION_BAR(TRUE),;
 
 
   private final String mDefaultValue;

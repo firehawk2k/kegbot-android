@@ -18,6 +18,8 @@
  */
 package org.kegbot.app;
 
+import android.app.ActionBar;
+import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.Context;
@@ -30,7 +32,14 @@ import android.os.Handler;
 import android.os.Looper;
 import android.support.v4.view.ViewPager;
 import android.util.Log;
+import android.util.Pair;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.ImageView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
@@ -48,8 +57,11 @@ import org.kegbot.app.event.ConnectivityChangedEvent;
 import org.kegbot.app.event.VisibleTapsChangedEvent;
 import org.kegbot.app.service.CheckinService;
 import org.kegbot.app.util.SortableFragmentStatePagerAdapter;
+import org.kegbot.app.util.Units;
 import org.kegbot.app.util.Utils;
+import org.kegbot.app.view.BadgeView;
 import org.kegbot.core.KegbotCore;
+import org.kegbot.proto.Models;
 import org.kegbot.proto.Models.KegTap;
 
 import java.io.IOException;
@@ -104,6 +116,23 @@ public class HomeActivity extends CoreActivity {
   private ViewPager mTapStatusPager;
   private AppConfiguration mConfig;
 
+
+  //for dummy pour status
+  private TextView mTapTitle;
+  private BadgeView mPourVolumeBadge;
+
+  //for backgrounds
+  private ImageView mImageView0;
+  private LinearLayout mImageView1;
+
+  //for start button/new drinker
+  private Button mStartButton;
+  private Button mNewDrinkerButton;
+  private LinearLayout mActivityControls;
+
+  private static final int REQUEST_AUTHENTICATE = 1000;
+  private static final int REQUEST_CREATE_DRINKER = 1001;
+
   /**
    * Keep track of Google Play Services error codes, and don't annoy when the same error persists.
    * (For some reason, {@link GooglePlayServicesUtil} treats absence of the apk as "user
@@ -144,6 +173,11 @@ public class HomeActivity extends CoreActivity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.main_activity);
 
+    final ActionBar actionBar = getActionBar();
+//    if (actionBar != null) {
+//      actionBar.hide();
+//    }
+
     synchronized (mTapsLock) {
       mTaps.clear();
     }
@@ -152,6 +186,26 @@ public class HomeActivity extends CoreActivity {
     mTapStatusPager = (ViewPager) findViewById(R.id.tap_status_pager);
     mTapStatusPager.setAdapter(mTapStatusAdapter);
     mTapStatusPager.setOffscreenPageLimit(8); // >8 Tap systems are rare
+
+
+    //for dummy pour status
+    mTapTitle = (TextView) findViewById(R.id.tapTitle);
+    mTapTitle.setText("Current Pour");
+    mPourVolumeBadge = (BadgeView) findViewById(R.id.pourStatsBadge1);
+    mPourVolumeBadge.setBadgeValue("0");
+    mPourVolumeBadge.setBadgeCaption("Current mL Poured");
+
+
+    //for backgrounds
+    mImageView0 = (ImageView) findViewById(R.id.imageView0);
+    mImageView1 = (LinearLayout) findViewById(R.id.imageView1);
+
+    //for start button/new drinker
+    mStartButton = (Button) findViewById(R.id.pourStartButton);
+    mNewDrinkerButton = (Button) findViewById(R.id.newDrinkerButton);
+    mActivityControls = (LinearLayout) findViewById(R.id.mainActivityControls);
+
+    overridePendingTransition(R.anim.image_fade_in, R.anim.image_fade_in);
   }
 
   @Override
@@ -165,6 +219,111 @@ public class HomeActivity extends CoreActivity {
     mCore = KegbotCore.getInstance(this);
     mConfig = mCore.getConfiguration();
     maybeShowTapWarnings();
+
+    //for dummy pour status
+    final Pair<String, String> qty = Units.localizeWithoutScaling(
+        mCore.getConfiguration(), 0.0);
+    mPourVolumeBadge.setBadgeValue(qty.first);
+    mPourVolumeBadge.setBadgeCaption("Current " + Units.capitalizeUnits(qty.second) + " Poured");
+
+    mImageView0.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        final ActionBar actionBar = getActionBar();
+        if (actionBar.isShowing()) {
+          actionBar.hide();
+          mConfig.setShowActionBar(false);
+        } else {
+          actionBar.show();
+          mConfig.setShowActionBar(true);
+        }
+      }
+    });
+
+    //for start button
+    final Context thisContext = this;
+    mStartButton.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        if (mConfig.useAccounts()) {
+          final Intent intent = KegtabCommon.getAuthDrinkerActivityIntent(thisContext);
+          startActivityForResult(intent, REQUEST_AUTHENTICATE);
+        } else {
+          mCore.getFlowManager().activateUserAmbiguousTap("");
+        }
+
+      }
+    });
+
+    mNewDrinkerButton.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        final Intent intent = KegtabCommon.getCreateDrinkerActivityIntent(thisContext);
+        startActivityForResult(intent, REQUEST_CREATE_DRINKER);
+      }
+    });
+
+    mTapStatusPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+      @Override
+      public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+
+      }
+
+      @Override
+      public void onPageSelected(int position) {
+
+        //for progress bar
+        if (mTaps.size() > 0) {
+          final KegTap tap = mTaps.get(position);
+          if (tap.hasCurrentKeg()) {
+            final Models.Keg keg = tap.getCurrentKeg();
+            double remainml = keg.getRemainingVolumeMl();
+            double totalml = keg.getFullVolumeMl();
+            double percent = (remainml) / (totalml) * 100;
+
+            final ProgressBar mTapProgress = (ProgressBar) findViewById(R.id.tapProgress);
+            mTapProgress.setMax((int) totalml);
+            mTapProgress.setProgress((int) remainml);
+
+            final TextView mTapPercentage = (TextView) findViewById(R.id.tapPercentage);
+            mTapPercentage.setText(String.format("%.2f", percent) + "%");
+          }
+        }
+
+        //for backgrounds
+        switch (position) {
+          case 0:
+            mImageView0.setImageResource(R.drawable.e1);
+            mImageView1.setBackgroundResource(R.drawable.e2);
+            break;
+          case 1:
+            mImageView0.setImageResource(R.drawable.a1);
+            mImageView1.setBackgroundResource(R.drawable.a2);
+            break;
+          case 2:
+            mImageView0.setImageResource(R.drawable.b1);
+            mImageView1.setBackgroundResource(R.drawable.b2);
+            break;
+          case 3:
+            mImageView0.setImageResource(R.drawable.c1);
+            mImageView1.setBackgroundResource(R.drawable.c2);
+            break;
+          case 4:
+            mImageView0.setImageResource(R.drawable.d1);
+            mImageView1.setBackgroundResource(R.drawable.d2);
+            break;
+          default:
+            mImageView0.setImageResource(R.drawable.e1);
+            mImageView1.setBackgroundResource(R.drawable.e2);
+            break;
+        }
+      }
+
+      @Override
+      public void onPageScrollStateChanged(int state) {
+
+      }
+    });
   }
 
   @Override
@@ -174,6 +333,29 @@ public class HomeActivity extends CoreActivity {
     mCore.getBus().register(this);
     mCore.getHardwareManager().refreshSoon();
     startAttractMode();
+
+
+    boolean showControls = false;
+    if (mConfig.getAllowManualLogin()) {
+      mStartButton.setVisibility(View.VISIBLE);
+      showControls = true;
+    } else {
+      mStartButton.setVisibility(View.GONE);
+    }
+
+    if (mConfig.getAllowRegistration() && mConfig.useAccounts()) {
+      mNewDrinkerButton.setVisibility(View.VISIBLE);
+      showControls = true;
+    } else {
+      mNewDrinkerButton.setVisibility(View.GONE);
+    }
+
+    if (showControls && mConfig.getRunCore()) {
+      mActivityControls.setVisibility(View.VISIBLE);
+    } else {
+      mActivityControls.setVisibility(View.GONE);
+    }
+
 
     if (checkPlayServices()) {
       doGcmRegistration();
@@ -239,6 +421,24 @@ public class HomeActivity extends CoreActivity {
       mTaps.clear();
       mTaps.addAll(newTapList);
       mTapStatusAdapter.notifyDataSetChanged();
+    }
+
+    //for progress bar
+    if (mTaps.size() > 0) {
+      final KegTap tap = mTaps.get(mTapStatusPager.getCurrentItem());
+      if (tap.hasCurrentKeg()) {
+        final Models.Keg keg = tap.getCurrentKeg();
+        double remainml = keg.getRemainingVolumeMl();
+        double totalml = keg.getFullVolumeMl();
+        double percent = (remainml) / (totalml) * 100;
+
+        final ProgressBar mTapProgress = (ProgressBar) findViewById(R.id.tapProgress);
+        mTapProgress.setMax((int) totalml);
+        mTapProgress.setProgress((int) remainml);
+
+        final TextView mTapPercentage = (TextView) findViewById(R.id.tapPercentage);
+        mTapPercentage.setText(String.format("%.2f", percent) + "%");
+      }
     }
 
     maybeShowTapWarnings();
@@ -451,14 +651,44 @@ public class HomeActivity extends CoreActivity {
     @Override
     public int getCount() {
       synchronized (mTapsLock) {
-        return mTaps.size() + 1;
+        return mTaps.size();
       }
     }
 
     @Override
     public float getPageWidth(int position) {
-      return 0.5f;
+      return 1.0f;
     }
   }
+
+
+//  @Override
+//  public void onActivityResult(int requestCode, int resultCode, Intent data) {
+//    switch (requestCode) {
+//      case REQUEST_AUTHENTICATE:
+//        Log.d(TAG, "Got authentication result.");
+//        if (resultCode == Activity.RESULT_OK && data != null) {
+//          final String username =
+//                  data.getStringExtra(KegtabCommon.ACTIVITY_AUTH_DRINKER_RESULT_EXTRA_USERNAME);
+//          if (!Strings.isNullOrEmpty(username)) {
+//            AuthenticatingActivity.startAndAuthenticate(getActivity(), username);
+//          }
+//        }
+//        break;
+//      case REQUEST_CREATE_DRINKER:
+//        Log.d(TAG, "Got registration result.");
+//        if (resultCode == Activity.RESULT_OK && data != null) {
+//          final String username =
+//                  data.getStringExtra(KegtabCommon.ACTIVITY_CREATE_DRINKER_RESULT_EXTRA_USERNAME);
+//          if (!Strings.isNullOrEmpty(username)) {
+//            Log.d(TAG, "Authenticating newly-created user.");
+//            AuthenticatingActivity.startAndAuthenticate(getActivity(), username);
+//          }
+//        }
+//        break;
+//      default:
+//        super.onActivityResult(requestCode, resultCode, data);
+//    }
+//  }
 
 }

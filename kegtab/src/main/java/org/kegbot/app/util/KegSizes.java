@@ -38,11 +38,11 @@ public class KegSizes {
   public static final String OTHER = "other";
 
   public static final Map<String, String> DESCRIPTIONS = ImmutableMap.<String, String>builder()
-      .put(CORNY, "Corny Keg (5 gal)")
-      .put(SIXTH_BARREL, "Sixth Barrel (5.17 gal)")
-      .put(QUARTER_BARREL, "Quarter Barrel (7.75)")
-      .put(EURO_HALF_BARREL, "European Half Barrel (50 L)")
-      .put(HALF_BARREL, "Half Barrel (15.5 gal)")
+      .put(CORNY, "Corny Keg (5 gal / 19L)")
+      .put(SIXTH_BARREL, "Sixth Barrel (5.17 gal / 20L)")
+      .put(QUARTER_BARREL, "Quarter Barrel (7.75gal / 30L)")
+      .put(EURO_HALF_BARREL, "European Half Barrel (13.2gal / 50 L)")
+      .put(HALF_BARREL, "Half Barrel (15.5 gal / 58.7L)")
       .put(EURO, "European Full Barrel (100 L)")
       .put(OTHER, "Other")
       .build();

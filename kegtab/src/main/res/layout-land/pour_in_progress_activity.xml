@@ -23,13 +23,13 @@
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
               android:gravity="top|center"
-              android:orientation="vertical"
+              android:orientation="horizontal"
               android:weightSum="4.0">
 
     <RelativeLayout
         android:layout_weight="2.0"
-        android:layout_width="match_parent"
-        android:layout_height="800dip"
+        android:layout_width="800dip"
+        android:layout_height="match_parent"
         android:orientation="horizontal"
         android:gravity="center">
         <ImageView
@@ -43,8 +43,8 @@
     <LinearLayout
         android:id="@+id/imageView1"
         android:layout_weight="2.0"
-        android:layout_width="match_parent"
-        android:layout_height="800dip"
+        android:layout_width="800dip"
+        android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="top|center"
         android:background="@drawable/e2"
@@ -106,7 +106,7 @@
             android:layout_height="400dip"
             android:orientation="horizontal"
             android:gravity="top|center"
-            android:weightSum="1.0">
+            android:weightSum="0.8">
             <!-- Left box: PourStatusFragment -->
 
             <android.support.v4.view.ViewPager
@@ -116,14 +116,6 @@
                 android:layout_height="match_parent">
             </android.support.v4.view.ViewPager>
 
-            <!-- Center box: Controls -->
-            <Button
-                android:id="@+id/pourEndButton"
-                style="@style/mediumButton"
-                android:layout_weight="0.20"
-                android:layout_width="0dip"
-                android:layout_height="match_parent"
-                android:text="@string/pour_button_done" />
             <!-- Right box: Camera Preview & Controls -->
 
             <LinearLayout
@@ -218,6 +210,19 @@
 
 
             </LinearLayout>
+        </LinearLayout>
+
+        <!-- Controls -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="bottom">
+
+            <Button
+                android:id="@+id/pourEndButton"
+                style="@style/mediumButton"
+                android:text="@string/pour_button_done" />
 
         </LinearLayout>
     </LinearLayout>

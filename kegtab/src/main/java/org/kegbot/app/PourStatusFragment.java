@@ -26,7 +26,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.Pair;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -42,6 +44,7 @@ import org.kegbot.app.util.Units;
 import org.kegbot.app.view.BadgeView;
 import org.kegbot.core.AuthenticationManager;
 import org.kegbot.core.Flow;
+import org.kegbot.core.FlowManager;
 import org.kegbot.core.KegbotCore;
 import org.kegbot.proto.Models.Keg;
 import org.kegbot.proto.Models.KegTap;
@@ -69,11 +72,16 @@ public class PourStatusFragment extends ListFragment {
   private ImageDownloader mImageDownloader;
 
   private View mView;
+
+  private GestureDetector mGestureDetector;
+  private GestureDetector.OnGestureListener mOnGestureListener;
+  private View.OnTouchListener mOnTouchListener;
+
   private BadgeView mPourVolumeBadge;
   private TextView mTapTitle;
   private TextView mTapSubtitle;
   private TextView mStatusLine;
-  private ImageView mBeerImage;
+  //private ImageView mBeerImage;
 
   private final Runnable mCounterIncrementRunnable = new Runnable() {
     @Override
@@ -108,6 +116,7 @@ public class PourStatusFragment extends ListFragment {
             mStatusLine.setVisibility(View.VISIBLE);
           } else {
             mStatusLine.setVisibility(View.INVISIBLE);
+            setVolumeDisplay(flow.getVolumeMl());
           }
         }
       }
@@ -138,7 +147,7 @@ public class PourStatusFragment extends ListFragment {
   public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
     mView = inflater.inflate(R.layout.pour_status_item_layout, container, false);
 
-    mPourVolumeBadge = (BadgeView) mView.findViewById(R.id.tapStatsBadge1);
+    mPourVolumeBadge = (BadgeView) mView.findViewById(R.id.pourStatsBadge1);
     mPourVolumeBadge.setBadgeValue("0.0");
     mPourVolumeBadge.setBadgeCaption("Ounces Poured");
 
@@ -146,9 +155,31 @@ public class PourStatusFragment extends ListFragment {
     mTapSubtitle = (TextView) mView.findViewById(R.id.tapSubtitle);
 
     mStatusLine = (TextView) mView.findViewById(R.id.tapNotes);
-    mBeerImage = (ImageView) mView.findViewById(R.id.tapImage);
+    //mBeerImage = (ImageView) mView.findViewById(R.id.tapImage);
 
     setVolumeDisplay(0);
+
+    mOnGestureListener = new GestureDetector.SimpleOnGestureListener() {
+      @Override
+      public boolean onSingleTapUp(MotionEvent e) {
+        final FlowManager flowManager = mCore.getFlowManager();
+        if (mFlow != null) {
+          flowManager.endFlow(mFlow);
+        }
+        return true;
+      }
+    };
+
+    mGestureDetector = new GestureDetector(getActivity(), mOnGestureListener);
+    mOnTouchListener = new View.OnTouchListener() {
+      @Override
+      public boolean onTouch(View view, MotionEvent motionEvent) {
+        return mGestureDetector.onTouchEvent(motionEvent);
+      }
+    };
+
+    mView.setOnTouchListener(mOnTouchListener);
+
 
     return mView;
   }
@@ -211,12 +242,12 @@ public class PourStatusFragment extends ListFragment {
     final Pair<String, String> qty = Units.localizeWithoutScaling(
         mCore.getConfiguration(), volumeMl);
     mPourVolumeBadge.setBadgeValue(qty.first);
-    mPourVolumeBadge.setBadgeCaption(Units.capitalizeUnits(qty.second) + " Poured");
+    mPourVolumeBadge.setBadgeCaption("Current " + Units.capitalizeUnits(qty.second) + " Poured");
   }
 
   private void applyTapDetail() {
     final KegTap tap = getTap();
-    mBeerImage.setImageResource(R.drawable.kegbot_unknown_square_2);
+    //mBeerImage.setImageResource(R.drawable.kegbot_unknown_square_2);
 
     final Keg keg = tap.getCurrentKeg();
 
@@ -227,13 +258,15 @@ public class PourStatusFragment extends ListFragment {
       if (!Strings.isNullOrEmpty(beerName) && mTapTitle != null) {
         mTapTitle.setText(beerName);
       }
-
+      mTapTitle.setText( "Current Pour");
       // Set beer image.
-      if (keg.getBeverage().hasPicture()) {
-        mImageDownloader.download(keg.getBeverage().getPicture().getUrl(), mBeerImage);
-      }
+      //if (keg.getBeverage().hasPicture()) {
+      //  mImageDownloader.download(keg.getBeverage().getPicture().getUrl(), mBeerImage);
+      //}
       mTapSubtitle.setText(tap.getName());
-    } else {
+      mTapSubtitle.setVisibility(View.INVISIBLE);
+    }
+    else {
       mTapTitle.setText(tap.getName());
     }
   }

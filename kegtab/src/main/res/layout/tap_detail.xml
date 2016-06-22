@@ -20,7 +20,7 @@
 
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:background="@drawable/shape_rounded_rect"
                 android:orientation="vertical">
 
@@ -50,7 +50,7 @@
     <ViewFlipper
         android:id="@+id/tapStatusFlipper"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:layout_below="@+id/tap_detail_divider">
 
         <include

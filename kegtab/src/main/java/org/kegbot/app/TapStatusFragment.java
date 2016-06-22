@@ -44,10 +44,13 @@ import org.kegbot.app.event.VisibleTapsChangedEvent;
 import org.kegbot.app.util.ImageDownloader;
 import org.kegbot.app.util.Units;
 import org.kegbot.app.view.BadgeView;
+import org.kegbot.backend.LocalBackend;
 import org.kegbot.core.KegbotCore;
+import org.kegbot.proto.Models;
 import org.kegbot.proto.Models.Image;
 import org.kegbot.proto.Models.Keg;
 import org.kegbot.proto.Models.KegTap;
+import org.kegbot.proto.Models.ThermoSensor;
 
 import butterknife.ButterKnife;
 
@@ -61,6 +64,7 @@ public class TapStatusFragment extends Fragment {
   private static final int REQUEST_AUTHENTICATE = 1000;
 
   private KegbotCore mCore;
+  private AppConfiguration mConfig;
   private ImageDownloader mImageDownloader;
   private View mView;
 
@@ -81,6 +85,7 @@ public class TapStatusFragment extends Fragment {
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     mCore = KegbotCore.getInstance(getActivity());
+    mConfig = mCore.getConfiguration();
     mImageDownloader = mCore.getImageDownloader();
     updateTapDetails();
   }
@@ -109,6 +114,7 @@ public class TapStatusFragment extends Fragment {
     mOnGestureListener = new GestureDetector.SimpleOnGestureListener() {
       @Override
       public boolean onSingleTapUp(MotionEvent e) {
+        updateTapDetails();
         handleTapClicked();
         return true;
       }
@@ -198,12 +204,12 @@ public class TapStatusFragment extends Fragment {
 
     final TextView title = ButterKnife.findById(mView, R.id.tapTitle);
     final TextView subtitle = ButterKnife.findById(mView, R.id.tapSubtitle);
-    final TextView tapNotes = ButterKnife.findById(mView, R.id.tapNotes);
+    //final TextView tapNotes = ButterKnife.findById(mView, R.id.tapNotes);
     final ViewFlipper flipper = ButterKnife.findById(mView, R.id.tapStatusFlipper);
 
     title.setOnTouchListener(mOnTouchListener);
     subtitle.setOnTouchListener(mOnTouchListener);
-    tapNotes.setOnTouchListener(mOnTouchListener);
+    //tapNotes.setOnTouchListener(mOnTouchListener);
     flipper.setOnTouchListener(mOnTouchListener);
 
     final Button button = ButterKnife.findById(mView, R.id.tapKegButton);
@@ -215,8 +221,8 @@ public class TapStatusFragment extends Fragment {
       }
     });
 
-    tapNotes.setText("Last synced: " + DateUtils.formatDateTime(activity, System.currentTimeMillis(),
-        DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME));
+    //tapNotes.setText("Last synced: " + DateUtils.formatDateTime(activity, System.currentTimeMillis(),
+    //    DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME));
 
     if (tap == null) {
       Log.w(TAG, "Called with empty tap detail.");
@@ -252,22 +258,28 @@ public class TapStatusFragment extends Fragment {
       description = tap.getDescription();
     }
 
-    final ImageView tapImage = (ImageView) mView.findViewById(R.id.tapImage);
-
-    // Show tap image, or notes if none available.
-    tapImage.setVisibility(View.VISIBLE);
-    tapNotes.setVisibility(View.GONE);
-    tapImage.setImageResource(R.drawable.kegbot_unknown_square_2);
-
-    if (keg.getBeverage().hasPicture()) {
-      final Image image = keg.getBeverage().getPicture();
-      final String imageUrl = image.getUrl();
-      mImageDownloader.download(imageUrl, tapImage);
-    } else if (!Strings.isNullOrEmpty(description)) {
-      tapImage.setVisibility(View.GONE);
-      tapNotes.setVisibility(View.VISIBLE);
-      tapNotes.setText(description);
-    }
+      double servedml = keg.getServedVolumeMl();
+      double remainml = keg.getRemainingVolumeMl();
+      double totalml = keg.getFullVolumeMl();
+      double percent = (remainml) / (totalml) * 100;
+//      tapNotes.setText("Percent remaining: " + String.format("%.2f", percent) + "%");
+//      tapNotes.setVisibility(View.INVISIBLE);
+//    final ImageView tapImage = (ImageView) mView.findViewById(R.id.tapImage);
+//
+//    // Show tap image, or notes if none available.
+//    tapImage.setVisibility(View.VISIBLE);
+//    tapNotes.setVisibility(View.GONE);
+//    tapImage.setImageResource(R.drawable.kegbot_unknown_square_2);
+//
+//    if (keg.getBeverage().hasPicture()) {
+//      final Image image = keg.getBeverage().getPicture();
+//      final String imageUrl = image.getUrl();
+//      mImageDownloader.download(imageUrl, tapImage);
+//    } else if (!Strings.isNullOrEmpty(description)) {
+//      tapImage.setVisibility(View.GONE);
+//      tapNotes.setVisibility(View.VISIBLE);
+//      tapNotes.setText(description);
+//    }
 
     // TODO(mikey): proper units support
     // Badge 1: Pints Poured
@@ -276,7 +288,7 @@ public class TapStatusFragment extends Fragment {
     Pair<String, String> qtyPoured = Units.localize(mCore.getConfiguration(), mlPoured);
 
     badge1.setBadgeValue(qtyPoured.first);
-    badge1.setBadgeCaption(Units.capitalizeUnits(qtyPoured.second) + " Poured");
+    badge1.setBadgeCaption("Total " + Units.capitalizeUnits(qtyPoured.second) + " Poured");
 
     // Badge 2: Pints Remain
     final BadgeView badge2 = (BadgeView) mView.findViewById(R.id.tapStatsBadge2);
@@ -287,10 +299,21 @@ public class TapStatusFragment extends Fragment {
     badge2.setBadgeCaption(Units.capitalizeUnits(qtyRemain.second) + " Left");
 
     // Badge 3: Temperature
-    // TODO(mikey): Preference for C/F
     final BadgeView badge3 = (BadgeView) mView.findViewById(R.id.tapStatsBadge3);
-    if (tap.hasLastTemperature()) {
-      double lastTemperature = tap.getLastTemperature().getTemperatureC();
+    double lastTemperature = Double.NaN;
+    if (mConfig.isLocalBackend()) {
+      final LocalBackend backend = (LocalBackend) mCore.getBackend();
+      lastTemperature = backend.mTemperature;
+      badge3.setVisibility(View.VISIBLE);
+    }
+    else if (tap.hasLastTemperature()) {
+      lastTemperature = tap.getLastTemperature().getTemperatureC();
+      badge3.setVisibility(View.VISIBLE);
+    }
+    else {
+      badge3.setVisibility(View.GONE);
+    }
+    if ( !Double.isNaN(lastTemperature) ) {
       String units = "C";
       if (!mCore.getConfiguration().getTemperaturesCelsius()) {
         lastTemperature = Units.temperatureCToF(lastTemperature);
@@ -299,8 +322,8 @@ public class TapStatusFragment extends Fragment {
       final String tempValue = String.format("%.1f\u00B0", Double.valueOf(lastTemperature));
       badge3.setBadgeValue(tempValue);
       badge3.setBadgeCaption(String.format("Temperature (%s)", units));
-      badge3.setVisibility(View.VISIBLE);
-    } else {
+    }
+    else {
       badge3.setVisibility(View.GONE);
     }
   }

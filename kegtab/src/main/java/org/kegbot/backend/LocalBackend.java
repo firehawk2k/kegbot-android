@@ -27,6 +27,7 @@ import android.util.Log;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Maps;
 
 import org.codehaus.jackson.JsonNode;
 import org.kegbot.app.util.KegSizes;
@@ -52,6 +53,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
@@ -62,6 +64,8 @@ public class LocalBackend implements Backend {
 
   private LocalBackendDbHelper mDb;
   private ContentResolver mContentResolver;
+
+  public double mTemperature = Double.NaN;
 
   @Override
   public void start(Context context) {
@@ -250,7 +254,18 @@ public class LocalBackend implements Backend {
 
   @Override
   public ThermoLog recordTemperature(RecordTemperatureRequest request) throws BackendException {
-    // Ignored.
+    if (!request.isInitialized()) {
+      throw new BackendException("Request is missing required field(s)");
+    }
+
+    final String sensorName = request.getSensorName();
+    final String sensorValue = String.valueOf(request.getTempC());
+    final Map<String, String> params = Maps.newLinkedHashMap();
+    params.put("temp_c", sensorValue);
+
+    final double temperatureValue = request.getTempC();
+    mTemperature = temperatureValue;
+    //return (ThermoLog) postProto("/thermo-sensors/" + sensorName, ThermoLog.newBuilder(), params);
     return null;
   }
 

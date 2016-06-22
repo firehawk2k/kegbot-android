@@ -62,10 +62,10 @@
         android:required="false"/>
 
     <supports-screens
+        android:xlargeScreens="true"
         android:largeScreens="true"
         android:normalScreens="false"
-        android:smallScreens="false"
-        android:xlargeScreens="true"/>
+        android:smallScreens="false"/>
 
     <!-- Hack for Nexus 7 support, per http://stackoverflow.com/a/11745425/642485 -->
     <!-- TODO(mikey): figure out what's really going on here. -->
@@ -112,6 +112,13 @@
         <screen
             android:screenDensity="213"
             android:screenSize="large"/>
+        <!-- Special case for Nexus 5 -->
+        <screen
+            android:screenDensity="445"
+            android:screenSize="large" />
+        <screen
+            android:screenDensity="480"
+            android:screenSize="large" />
     </compatible-screens>
 
     <application
@@ -121,7 +128,8 @@
         android:icon="@drawable/icon"
         android:label="@string/app_name"
         android:logo="@drawable/kegbot_logo"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        android:largeHeap="true">
 
         <!-- ########## -->
         <!-- ACTIVITIES -->
@@ -131,7 +139,6 @@
             android:name="org.kegbot.app.KegtabLauncherActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
             android:theme="@style/AppTheme.NoActionBar"
             android:windowSoftInputMode="stateAlwaysHidden|adjustPan">
             <intent-filter>
@@ -152,17 +159,14 @@
             android:name="org.kegbot.app.HomeActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="stateAlwaysHidden|adjustPan">
         </activity>
         <activity
             android:name="org.kegbot.app.BugreportActivity"
             android:label="@string/app_name"
-            android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape">
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
-
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </activity>
@@ -170,20 +174,17 @@
             android:name="org.kegbot.app.CalibrationActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
             android:theme="@style/AppTheme.NoActionBar">
         </activity>
         <activity
             android:name="org.kegbot.app.NewControllerActivity"
             android:label="@string/app_name"
-            android:screenOrientation="sensorLandscape"
             android:theme="@android:style/Theme.Holo.Dialog.NoActionBar">
         </activity>
         <activity
             android:name="org.kegbot.app.NewKegActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
             android:theme="@style/AppTheme.NoActionBar"
             android:windowSoftInputMode="adjustPan">
         </activity>
@@ -191,7 +192,6 @@
             android:name="org.kegbot.app.NewTapActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
             android:theme="@style/AppTheme.NoActionBar"
             android:windowSoftInputMode="adjustPan">
         </activity>
@@ -199,7 +199,6 @@
             android:name="org.kegbot.app.setup.SetupActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
             android:theme="@style/AppTheme.NoActionBar"
             android:windowSoftInputMode="adjustPan">
         </activity>
@@ -207,15 +206,12 @@
             android:name="org.kegbot.app.PourInProgressActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
-            android:theme="@style/AppTheme.NoActionBar"
             android:windowSoftInputMode="stateHidden|adjustPan"/>
         <activity
             android:name="org.kegbot.app.DrinkerSelectActivity"
             android:exported="false"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="stateHidden|adjustPan">
             <intent-filter>
                 <action android:name="org.kegbot.app.activity.AUTH_DRINKER"/>
@@ -237,7 +233,6 @@
             android:exported="false"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="stateVisible|adjustPan">
             <intent-filter>
                 <action android:name="org.kegbot.app.activity.NEW_DRINKER"/>

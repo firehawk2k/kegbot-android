@@ -28,6 +28,7 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -36,12 +37,14 @@ import android.support.v4.view.ViewPager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.ViewFlipper;
 
@@ -56,19 +59,27 @@ import org.kegbot.app.event.FlowUpdateEvent;
 import org.kegbot.app.event.PictureDiscardedEvent;
 import org.kegbot.app.event.PictureTakenEvent;
 import org.kegbot.app.util.ImageDownloader;
+import org.kegbot.app.util.Units;
 import org.kegbot.app.util.Utils;
+import org.kegbot.app.view.BadgeView;
+import org.kegbot.backend.Backend;
+import org.kegbot.backend.LocalBackend;
 import org.kegbot.core.AuthenticationManager;
 import org.kegbot.core.Flow;
 import org.kegbot.core.FlowManager;
 import org.kegbot.core.KegbotCore;
+import org.kegbot.proto.Models;
 import org.kegbot.proto.Models.KegTap;
 import org.kegbot.proto.Models.User;
+import org.kegbot.proto.Models.ThermoSensor;
 
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation.concurrent.GuardedBy;
+
+import butterknife.ButterKnife;
 
 /**
  * Activity shown while a pour is in progress.
@@ -110,6 +121,12 @@ public class PourInProgressActivity extends CoreActivity {
   private TextView mShoutText;
   private Button mDoneButton;
   private ViewPager mTapPager;
+  private Button mAddButton;
+  private Button mSubtractButton;
+
+  //for backgrounds
+  private ImageView mImageView0;
+  private LinearLayout mImageView1;
 
   private final DialogFragment mIdleDialogFragment = new DialogFragment() {
     @Override
@@ -262,8 +279,15 @@ public class PourInProgressActivity extends CoreActivity {
     mConfig = mCore.getConfiguration();
     mImageDownloader = mCore.getImageDownloader();
 
+    overridePendingTransition(R.anim.image_fade_in, R.anim.image_fade_in);
     final ActionBar actionBar = getActionBar();
-    if (actionBar != null) {
+//    if (actionBar != null) {
+//      actionBar.hide();
+//    }
+    if ( mConfig.getShowActionBar() ) {
+      actionBar.show();
+    }
+    else {
       actionBar.hide();
     }
     setContentView(R.layout.pour_in_progress_activity);
@@ -279,6 +303,12 @@ public class PourInProgressActivity extends CoreActivity {
     mDoneButton = (Button) findViewById(R.id.pourEndButton);
     mDrinkerImage = (ImageView) findViewById(R.id.pourDrinkerImage);
     mShoutText = (TextView) findViewById(R.id.shoutText);
+    mAddButton = (Button) findViewById(R.id.pourAddButton);
+    mSubtractButton = (Button) findViewById(R.id.pourSubtractButton);
+
+    //for backgrounds
+    mImageView0 = (ImageView) findViewById(R.id.imageView0);
+    mImageView1 = (LinearLayout) findViewById(R.id.imageView1);
 
     mClaimPourButton.setOnClickListener(new View.OnClickListener() {
       @Override
@@ -293,6 +323,7 @@ public class PourInProgressActivity extends CoreActivity {
             PourInProgressActivity.this);
         intent.putExtra(EXTRA_FLOW_ID, flow.getFlowId());
         startActivityForResult(intent, REQUEST_AUTH_DRINKER);
+        overridePendingTransition(R.anim.image_fade_in, R.anim.image_fade_in);
       }
     });
 
@@ -305,6 +336,7 @@ public class PourInProgressActivity extends CoreActivity {
           return;
         }
         Log.d(TAG, "Done button pressed, ending flow " + flow.getFlowId());
+        overridePendingTransition(R.anim.image_fade_in, R.anim.image_fade_in);
         flowManager.endFlow(flow);
 
         // If we're finishing a non-dormant flow, and other dormant flows
@@ -320,6 +352,32 @@ public class PourInProgressActivity extends CoreActivity {
             }
           }
         }
+      }
+    });
+
+    mAddButton.setOnClickListener(new OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        final FlowManager flowManager = mCore.getFlowManager();
+        final Flow flow = getCurrentlyFocusedFlow();
+        if (flow == null) {
+          return;
+        }
+        flow.addTicks(135);
+        refreshFlows();
+      }
+    });
+
+    mSubtractButton.setOnClickListener(new OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        final FlowManager flowManager = mCore.getFlowManager();
+        final Flow flow = getCurrentlyFocusedFlow();
+        if (flow == null) {
+          return;
+        }
+        flow.addTicks(-135);
+        refreshFlows();
       }
     });
 
@@ -347,9 +405,13 @@ public class PourInProgressActivity extends CoreActivity {
 
     mShowCamera = true;
     mCameraFragment = (CameraFragment) getFragmentManager().findFragmentById(R.id.camera);
+    mAddButton.setVisibility(View.GONE);
+    mSubtractButton.setVisibility(View.GONE);
     if (!mConfig.getUseCamera() || !mConfig.getTakePhotosDuringPour()) {
       mShowCamera = false;
       getFragmentManager().beginTransaction().hide(mCameraFragment).commit();
+      mAddButton.setVisibility(View.VISIBLE);
+      mSubtractButton.setVisibility(View.VISIBLE);
     }
 
     refreshFlows();
@@ -425,6 +487,98 @@ public class PourInProgressActivity extends CoreActivity {
         mDrinkerImage.setImageBitmap(null);
         Utils.setBackground(mDrinkerImage, getResources().getDrawable(R.drawable.unknown_drinker));
       }
+    }
+
+    //dummy tap status
+    {
+      final TextView title = (TextView) findViewById(R.id.tapTitle);
+      final TextView subtitle = (TextView) findViewById(R.id.tapSubtitle);
+
+      KegTap tap = getCurrentlyFocusedTap();
+      final String tapName = tap.getName();
+      if (!Strings.isNullOrEmpty(tapName)) {
+        subtitle.setText(tapName);
+      }
+
+      if (!tap.hasCurrentKeg()) {
+        return;
+      }
+
+      final Models.Keg keg = tap.getCurrentKeg();
+      title.setText(keg.getBeverage().getName());
+
+      // Badge 1: Pints Poured
+      final BadgeView badge1 = (BadgeView) findViewById(R.id.tapStatsBadge1);
+      double mlPoured = keg.getServedVolumeMl();
+      Pair<String, String> qtyPoured = Units.localize(mCore.getConfiguration(), mlPoured);
+
+      badge1.setBadgeValue(qtyPoured.first);
+      badge1.setBadgeCaption("Total " + Units.capitalizeUnits(qtyPoured.second) + " Poured");
+
+      // Badge 2: Pints Remain
+      final BadgeView badge2 = (BadgeView) findViewById(R.id.tapStatsBadge2);
+      Pair<String, String> qtyRemain = Units.localize(mCore.getConfiguration(),
+              keg.getRemainingVolumeMl());
+
+      badge2.setBadgeValue(qtyRemain.first);
+      badge2.setBadgeCaption(Units.capitalizeUnits(qtyRemain.second) + " Left");
+
+      // Badge 3: Temperature
+      final BadgeView badge3 = (BadgeView) findViewById(R.id.tapStatsBadge3);
+      double lastTemperature = Double.NaN;
+      if (mConfig.isLocalBackend()) {
+        final LocalBackend backend = (LocalBackend) mCore.getBackend();
+        lastTemperature = backend.mTemperature;
+        badge3.setVisibility(View.VISIBLE);
+      }
+      else if (tap.hasLastTemperature()) {
+        lastTemperature = tap.getLastTemperature().getTemperatureC();
+        badge3.setVisibility(View.VISIBLE);
+      }
+      else {
+        badge3.setVisibility(View.GONE);
+      }
+      if ( !Double.isNaN(lastTemperature) ) {
+        String units = "C";
+        if (!mCore.getConfiguration().getTemperaturesCelsius()) {
+          lastTemperature = Units.temperatureCToF(lastTemperature);
+          units = "F";
+        }
+        final String tempValue = String.format("%.1f\u00B0", Double.valueOf(lastTemperature));
+        badge3.setBadgeValue(tempValue);
+        badge3.setBadgeCaption(String.format("Temperature (%s)", units));
+      }
+      else {
+        badge3.setVisibility(View.GONE);
+      }
+    }
+
+    //for backgrounds
+    switch (mTapPager.getCurrentItem()) {
+      case 0:
+        mImageView0.setImageResource(R.drawable.e1);
+        mImageView1.setBackgroundResource(R.drawable.e2);
+        break;
+      case 1:
+        mImageView0.setImageResource(R.drawable.a1);
+        mImageView1.setBackgroundResource(R.drawable.a2);
+        break;
+      case 2:
+        mImageView0.setImageResource(R.drawable.b1);
+        mImageView1.setBackgroundResource(R.drawable.b2);
+        break;
+      case 3:
+        mImageView0.setImageResource(R.drawable.c1);
+        mImageView1.setBackgroundResource(R.drawable.c2);
+        break;
+      case 4:
+        mImageView0.setImageResource(R.drawable.d1);
+        mImageView1.setBackgroundResource(R.drawable.d2);
+        break;
+      default:
+        mImageView0.setImageResource(R.drawable.e1);
+        mImageView1.setBackgroundResource(R.drawable.e2);
+        break;
     }
   }
 
